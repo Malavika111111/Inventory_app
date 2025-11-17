@@ -1,0 +1,98 @@
+<h3>Manager Dashboard</h3>
+<p>Welcome, {{ user_name }}</p>
+
+<h4>Pending Requests</h4>
+<table class="table table-bordered">
+    <thead>
+        <tr>
+            {% for h in req_headers %}
+                <th>{{ h }}</th>
+            {% endfor %}
+            <th>Action</th>
+        </tr>
+    </thead>
+    <tbody id="pending-requests-tbody">
+        {% for r in requests %}
+            {% if r['Status'] == 'Pending' %}
+            <tr id="request-row-{{ r['RequestID'] }}">
+                {% for h in req_headers %}
+                    <td>{{ r[h] }}</td>
+                {% endfor %}
+                <td>
+                    <form class="manager-action-form" data-request-id="{{ r['RequestID'] }}">
+                        <input type="text" name="remarks" placeholder="Remarks" class="form-control form-control-sm mb-1">
+                        <button type="button" class="btn btn-success btn-sm approve-btn">Approve</button>
+                        <button type="button" class="btn btn-danger btn-sm deny-btn">Deny</button>
+                    </form>
+                </td>
+            </tr>
+            {% endif %}
+        {% endfor %}
+    </tbody>
+</table>
+
+<h4>Activities</h4>
+<table class="table table-bordered">
+    <thead>
+        <tr>
+            <th>Request ID</th>
+            <th>Component</th>
+            <th>Quantity</th>
+            <th>Status</th>
+            <th>Manager Remarks</th>
+        </tr>
+    </thead>
+    <tbody id="activities-tbody">
+        {% for r in requests %}
+            {% if r['Status'] != 'Pending' %}
+            <tr>
+                <td>{{ r['RequestID'] }}</td>
+                <td>{{ r['Component'] }}</td>
+                <td>{{ r['Quantity'] }}</td>
+                <td>{{ r['Status'] }}</td>
+                <td>{{ r['Remarks'] }}</td>
+            </tr>
+            {% endif %}
+        {% endfor %}
+    </tbody>
+</table>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script>
+$(document).ready(function() {
+    $(".manager-action-form button").click(function() {
+        let btn = $(this);
+        let form = btn.closest("form");
+        let requestId = form.data("request-id");
+        let action = btn.hasClass("approve-btn") ? "approve" : "deny";
+        let remarks = form.find("input[name='remarks']").val();
+
+        $.ajax({
+            url: "{{ url_for('manager_action') }}",
+            type: "POST",
+            data: {
+                request_id: requestId,
+                action: action,
+                remarks: remarks
+            },
+            success: function(response) {
+                alert(response.message); // optional flash alert
+
+                // Remove the row from Pending Requests
+                let row = $("#request-row-" + requestId);
+                row.find("td:last").remove(); // remove action buttons
+
+                // Add Status and Remarks columns for Activities
+                row.append("<td>" + action.charAt(0).toUpperCase() + action.slice(1) + "</td>");
+                row.append("<td>" + remarks + "</td>");
+
+                // Move row to Activities table
+                $("#activities-tbody").append(row);
+            },
+            error: function(xhr) {
+                alert("Error: " + (xhr.responseJSON?.message || "Something went wrong"));
+            }
+        });
+    });
+});
+</script>
