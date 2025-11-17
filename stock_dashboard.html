@@ -1,0 +1,40 @@
+<h3>Stock Engineer Dashboard</h3>
+<p>Welcome, {{ user_name }}</p>
+
+<h5>Update Inventory</h5>
+<table class="table table-bordered">
+    <thead>
+        <tr>
+            <th>Component</th>
+            <th>Description</th>
+            <th>Quantity</th>
+            <th>Tray</th>
+            <th>Remarks</th>
+            <th>Action</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for c in components %}
+        <tr>
+            <form method="POST" action="{{ url_for('stock_update') }}">
+            <td><input name="component" value="{{ c[0] }}"></td>
+            <td><input name="description" value="{{ c[1] }}"></td>
+            <td><input type="number" name="quantity" value="{{ c[2] }}"></td>
+            <td><input name="tray" value="{{ c[3] }}"></td>
+            <td><input name="remarks" value="{{ c[4] }}"></td>
+            <td><button type="submit" class="btn btn-primary btn-sm">Update</button></td>
+            </form>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<h5>Add New Component</h5>
+<form method="POST" action="{{ url_for('stock_update') }}">
+    <input name="component" placeholder="Component Name" required>
+    <input name="description" placeholder="Description">
+    <input type="number" name="quantity" placeholder="Quantity">
+    <input name="tray" placeholder="Tray">
+    <input name="remarks" placeholder="Remarks">
+    <button type="submit" class="btn btn-success btn-sm">Add Component</button>
+</form>
