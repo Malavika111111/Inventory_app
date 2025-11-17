@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Signup</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <style>
+        body {
+            background: #f4f6f9;
+            font-family: Arial, sans-serif;
+        }
+
+        .signup-card {
+            max-width: 420px;
+            margin: 50px auto;
+            padding: 25px 30px;
+            border-radius: 8px;
+            background: #fff;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .signup-card h3 {
+            text-align: center;
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+
+        .form-label {
+            font-weight: 600;
+        }
+
+        /* Scrollable flash messages */
+        .flash-messages {
+            max-height: 120px;
+            overflow-y: auto;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="signup-card">
+
+    <h3>Create Account</h3>
+
+    <!-- Flash Messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="flash-messages">
+          {% for category, message in messages %}
+            <div class="alert alert-{{ category }} py-2">{{ message }}</div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+
+    <!-- Inline Password Error -->
+    {% if error %}
+        <div class="alert alert-danger py-2 text-center">{{ error }}</div>
+    {% endif %}
+
+    <form method="POST" autocomplete="off">
+
+        <div class="mb-3">
+            <label class="form-label">Employee ID</label>
+            <input type="text" name="EmployeeID" class="form-control" required>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Name</label>
+            <input type="text" name="Name" class="form-control" required>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Designation</label>
+            <input type="text" name="Designation" class="form-control" required>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Role</label>
+            <select name="Role" class="form-control" required>
+                <option value="" disabled selected>Select Role</option>
+                <option value="user">User</option>
+                <option value="manager">Manager</option>
+                <option value="stock engineer">Stock Engineer</option>
+            </select>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Email</label>
+            <input type="email" name="Email" class="form-control" autocomplete="new-email" required>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Password</label>
+            <input type="password" name="Password" class="form-control" autocomplete="new-password" required>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Re-enter Password</label>
+            <input type="password" name="RePassword" class="form-control" autocomplete="new-password" required>
+        </div>
+
+        <button type="submit" class="btn btn-primary w-100 mt-2">Signup</button>
+    </form>
+
+    <p class="text-center mt-3">
+        Already have an account?
+        <a href="{{ url_for('login') }}">Login</a>
+    </p>
+
+</div>
+
+</body>
+</html>
