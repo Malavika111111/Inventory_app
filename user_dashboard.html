@@ -288,20 +288,24 @@ document.getElementById('searchInput').addEventListener('input', function() {
 
 document.getElementById('submitCart').addEventListener('click', function() {
     const project = document.getElementById('projectName').value.trim();
-    if (!project) return showWarning("Please enter Project Name!");
-
+    if (!project) return showWarning("Enter project name!");
     if (Object.keys(cart).length === 0) return showWarning("Cart is empty!");
 
     const items = Object.entries(cart).map(([name, d]) => ({
-        name, qty: d.qty, returnable: d.returnable, returnDate: d.returnDate
+        name: name,
+        qty: d.qty,
+        returnable: d.returnable,
+        returnDate: d.returnDate
     }));
 
     fetch('/submit_request', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+            'Content-Type': 'application/json'
+        },
         body: JSON.stringify({ project, items })
     })
-    .then(r => r.json())
+    .then(res => res.json())
     .then(data => {
         if (data.success) {
             alert(`Request ${data.request_id} submitted successfully!`);
@@ -309,9 +313,13 @@ document.getElementById('submitCart').addEventListener('click', function() {
             updateCart();
             document.getElementById('projectName').value = '';
             location.reload();
+        } else if (data.error) {
+            showWarning(data.error);
         }
-    });
+    })
+    .catch(err => showWarning("Failed to submit request"));
 });
+
 </script>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
