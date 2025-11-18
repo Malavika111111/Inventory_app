@@ -44,35 +44,32 @@ def get_user(email):
     users = users_ws.get_all_records()
     return next((u for u in users if u.get("Email", "").lower() == email.lower()), None)
 
-def update_request_status(request_id, new_status):
+def update_request_status(request_id, new_status, manager_name=""):
     try:
-        # Find all rows with this Request_ID
-        cell_list = requests_ws.findall(str(request_id))
-        if not cell_list:
+        # Find all rows where column A = Request_ID
+        cells = requests_ws.findall(request_id, in_column=1)
+
+        if not cells:
             return False
 
-        updates = []
-        for cell in cell_list:
+        for cell in cells:
             row = cell.row
-            # Update Status (Column G)
-            updates.append({
-                "range": f"G{row}",
-                "values": [[new_status]]
-            })
-            # Optional: Update timestamp (Column H)
-            from datetime import datetime
-            updates.append({
-                "range": f"H{row}",
-                "values": [[datetime.now().strftime("%Y-%m-%d %H:%M")]]
-            })
 
-        # Batch update — FAST & SAFE
-        requests_ws.batch_update({"valueInputOption": "RAW", "data": updates})
+            # Status → Column G
+            requests_ws.update_cell(row, 7, new_status)
+
+            # Action Timestamp → Column H
+            requests_ws.update_cell(row, 8, datetime.now().strftime("%Y-%m-%d %H:%M"))
+
+            # Manager Name (optional) → Column J
+            requests_ws.update_cell(row, 10, manager_name)
+
         return True
 
     except Exception as e:
-        print(f"Google Sheets Error: {e}")
+        print("Error updating request:", e)
         return False
+
     
 def login_required(role=None):
     def decorator(f):
@@ -213,6 +210,7 @@ def submit_request(user):
 @app.route('/manager')
 @login_required("manager")
 def manager_dashboard(user):
+
     requests = get_requests()
     components = get_components()
 
@@ -233,10 +231,12 @@ def manager_dashboard(user):
 @app.route('/approve/<req_id>')
 @login_required("manager")
 def approve_request(user, req_id):
-    if update_request_status(req_id, "Approved"):
-        flash(f"Request {req_id} Approved Successfully!", "success")
+    ok = update_request_status(req_id, "Approved", user["Name"])
+
+    if ok:
+        flash(f"Request {req_id} approved!", "success")
     else:
-        flash("Failed to update Google Sheets", "danger")
+        flash("Failed to update Google Sheet", "danger")
 
     return redirect(url_for('manager_dashboard'))
 
@@ -244,13 +244,15 @@ def approve_request(user, req_id):
 @app.route('/reject/<req_id>')
 @login_required("manager")
 def reject_request(user, req_id):
-    cells = requests_ws.findall(req_id, in_column=1)
+    ok = update_request_status(req_id, "Rejected", user["Name"])
 
-    for cell in cells:
-        requests_ws.update(f'G{cell.row}', [[ "Rejected" ]])
+    if ok:
+        flash(f"Request {req_id} rejected!", "warning")
+    else:
+        flash("Failed to update Google Sheet", "danger")
 
-    flash(f"Request {req_id} rejected", "warning")
     return redirect(url_for('manager_dashboard'))
+
 
 
 @app.route('/download_report')
