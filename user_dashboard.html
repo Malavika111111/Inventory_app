@@ -86,7 +86,7 @@
             </div>
         </div>
 
-        <!-- OTHER TABS (unchanged) -->
+        <!-- MY REQUESTS TAB -->
         <div class="tab-pane fade" id="myreq">
             <h4>My Requests</h4>
             {% if requests %}
@@ -116,18 +116,53 @@
             {% else %}<p class="text-center text-muted py-5">No requests yet.</p>{% endif %}
         </div>
 
+        <!-- BORROWED ITEMS TAB -->
         <div class="tab-pane fade" id="borrowings">
             <h4>My Borrowed Items</h4>
             {% set borrowed = requests | selectattr("Status", "equalto", "Approved") | list %}
-            {% if borrowed %}<table class="table"><tbody>{% for r in borrowed %}<tr><td>{{ r.Request_ID }}</td><td>{{ r.Component_Name }}</td><td>{{ r.Qty_Requested }}</td><td>{{ r.Purpose }}</td><td>{{ r.Approved_At[:10] or "—" }}</td></tr>{% endfor %}</tbody></table>
-            {% else %}<p class="text-center text-muted py-5">No borrowed items.</p>{% endif %}
+            {% if borrowed %}
+                <table class="table">
+                    <tbody>
+                        {% for r in borrowed %}
+                        <tr>
+                            <td>{{ r.Request_ID }}</td>
+                            <td>{{ r.Component_Name }}</td>
+                            <td>{{ r.Qty_Requested }}</td>
+                            <td>{{ r.Purpose }}</td>
+                            <td>{{ r.Requested_At[:10] }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p class="text-center text-muted py-5">No borrowed items.</p>
+            {% endif %}
         </div>
 
+        <!-- ACTIVITY LOG TAB -->
         <div class="tab-pane fade" id="activity">
             <h4>Activity Log</h4>
-            {% if requests %}<table class="table"><tbody>{% for r in requests | reverse %}<tr><td>{{ r.Requested_At[:16].replace(" ", "<br>") | safe }}</td><td>{% if r.Status == 'Pending' %}<span class="badge badge-pending text-white">Created</span>{% elif r.Status == 'Approved' %}<span class="badge badge-approved text-white">Approved</span>{% elif r.Status == 'Rejected' %}<span class="badge badge-rejected text-white">Rejected</span>{% endif %}</td><td>{{ r.Component_Name }} × {{ r.Qty_Requested }} — {{ r.Purpose }}</td></tr>{% endfor %}</tbody></table>
-            {% else %}<p class="text-center text-muted py-5">No activity.</p>{% endif %}
+            {% if requests %}
+            <table class="table">
+                <tbody>
+                    {% for r in requests | reverse %}
+                    <tr>
+                        <td>{{ r.Requested_At[:16].replace(" ", "<br>") | safe }}</td>
+                        <td>
+                            {% if r.Status == 'Pending' %}<span class="badge badge-pending text-white">Created</span>
+                            {% elif r.Status == 'Approved' %}<span class="badge badge-approved text-white">Approved</span>
+                            {% elif r.Status == 'Rejected' %}<span class="badge badge-rejected text-white">Rejected</span>{% endif %}
+                        </td>
+                        <td>{{ r.Component_Name }} × {{ r.Qty_Requested }} — {{ r.Purpose }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+                <p class="text-center text-muted py-5">No activity.</p>
+            {% endif %}
         </div>
+
     </div>
 </div>
 
@@ -136,7 +171,7 @@
 
 <script>
 let allComponents = [];
-let cart = {};  // { "ESP32": { qty: 2, returnable: true, returnDate: "2025-05-01" } }
+let cart = {};
 
 fetch('/api/components')
     .then(r => r.json())
@@ -185,7 +220,6 @@ function displayComponents(list) {
     }).join('');
 }
 
-// Show/hide return date
 document.addEventListener('change', function(e) {
     if (e.target.name && e.target.name.startsWith('return-')) {
         const safeName = e.target.name.split('-')[1];
@@ -239,14 +273,12 @@ function showWarning(msg, type = "error") {
     setTimeout(() => popup.style.display = 'none', 3000);
 }
 
-// Search
 document.getElementById('searchInput').addEventListener('input', function() {
     const query = this.value.toLowerCase();
     const filtered = allComponents.filter(c => c.name.toLowerCase().includes(query));
     displayComponents(filtered);
 });
 
-// Submit Cart
 document.getElementById('submitCart').addEventListener('click', function() {
     const project = document.getElementById('projectName').value.trim();
     if (!project) return showWarning("Please enter Project Name!");
