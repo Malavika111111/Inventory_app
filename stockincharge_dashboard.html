@@ -188,13 +188,28 @@ document.getElementById('submit-restock')?.addEventListener('click', () => {
     });
 });
 
-// Issue & Deduct (already handled by Manager approval, so just UI feedback)
+// Issue & Deduct Stock (REAL backend call)
 function issueRequest(req_id) {
-    if (confirm("Mark " + req_id + " as ISSUED? Stock already deducted on approval.")) {
-        alert("Request " + req_id + " marked as issued!");
-        // Optional: Add a column "Issued_At" later if needed
+    if (!confirm("Are you sure you want to ISSUE " + req_id + "? This will deduct actual stock.")) {
+        return;
     }
+
+    fetch('/issue_request', {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({ request_id: req_id })
+    })
+    .then(r => r.json())
+    .then(d => {
+        if (d.success) {
+            alert("Issued Successfully! Stock deducted.");
+            location.reload();
+        } else {
+            alert("Error: " + d.error);
+        }
+    });
 }
+
 
 document.addEventListener('click', e => {
     if (!e.target.closest('.search-box')) document.getElementById('search-results').style.display = 'none';
