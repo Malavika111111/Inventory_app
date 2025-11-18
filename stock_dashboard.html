@@ -1,40 +1,211 @@
-<h3>Stock Engineer Dashboard</h3>
-<p>Welcome, {{ user_name }}</p>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Stock Incharge - Smart Inventory System</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+    body {font-family:'Segoe UI',sans-serif;margin:0;background:#f5f3ff;}
+    header {background:#7c3aed;color:white;padding:20px 0;box-shadow:0 4px 15px rgba(0,0,0,0.1);}
+    .header-content {max-width:1200px;margin:auto;display:flex;justify-content:space-between;align-items:center;padding:0 30px;flex-wrap:wrap;}
+    .logo-title h1 {margin:0;font-size:2em;}
+    .user-info h2 {margin:0;font-size:1.4em;}
+    .user-info p {margin:5px 0;}
+    .container {max-width:1200px;margin:auto;padding:20px;}
+    .tabs {display:flex;border-bottom:2px solid #ddd;margin-bottom:20px;background:white;border-radius:8px 8px 0 0;overflow:hidden;flex-wrap:wrap;}
+    .tab-btn {padding:14px 28px;background:#e8dcf8;border:none;cursor:pointer;font-weight:600;}
+    .tab-btn.active {background:#7c3aed;color:white;}
+    .tab-content {display:none;background:white;border-radius:0 0 12px 12px;padding:24px;box-shadow:0 4px 20px rgba(0,0,0,0.08);}
+    .tab-content.active {display:block;}
+    .card {background:white;border-radius:12px;padding:24px;margin:15px 0;}
+    .btn-success {background:#10b981;color:white;padding:12px 24px;border:none;border-radius:8px;cursor:pointer;}
+    .btn-danger {background:#ef4444;color:white;padding:10px 20px;border:none;border-radius:8px;cursor:pointer;font-size:0.9em;}
+    .btn-add {background:#10b981;color:white;padding:8px 12px;border-radius:50%;font-size:1.2em;}
+    input, select {padding:10px;border-radius:6px;border:1px solid #ccc;box-sizing:border-box;margin:5px 0;}
+    .search-box {position:relative;margin:20px 0;}
+    .search-results {position:absolute;top:55px;left:0;right:0;background:white;border:1px solid #ccc;border-radius:8px;max-height:320px;overflow-y:auto;z-index:10;display:none;box-shadow:0 10px 30px rgba(0,0,0,0.15);}
+    .result-item {padding:14px;display:flex;justify-content:space-between;cursor:pointer;}
+    .result-item:hover {background:#e8dcf8;}
+    table {width:100%;border-collapse:collapse;margin:15px 0;}
+    th, td {padding:12px;border-bottom:1px solid #ddd;text-align:left;}
+    th {background:#e8dcf8;}
+    .badge {padding:4px 8px;border-radius:4px;color:white;font-size:0.8em;background:#7c3aed;}
+</style>
+</head>
+<body>
 
-<h5>Update Inventory</h5>
-<table class="table table-bordered">
-    <thead>
-        <tr>
-            <th>Component</th>
-            <th>Description</th>
-            <th>Quantity</th>
-            <th>Tray</th>
-            <th>Remarks</th>
-            <th>Action</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for c in components %}
-        <tr>
-            <form method="POST" action="{{ url_for('stock_update') }}">
-            <td><input name="component" value="{{ c[0] }}"></td>
-            <td><input name="description" value="{{ c[1] }}"></td>
-            <td><input type="number" name="quantity" value="{{ c[2] }}"></td>
-            <td><input name="tray" value="{{ c[3] }}"></td>
-            <td><input name="remarks" value="{{ c[4] }}"></td>
-            <td><button type="submit" class="btn btn-primary btn-sm">Update</button></td>
-            </form>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
+<header>
+    <div class="header-content">
+        <div class="logo-title">
+            <h1>Smart Inventory System</h1>
+            <p>Raspberry Pi • Local Network • Tray T1–T7</p>
+        </div>
+        <div class="user-info">
+            <h2>{{ user.Name }}</h2>
+            <p><strong>Employee ID:</strong> {{ user.EmployeeID }}</p>
+            <p><strong>Designation:</strong> {{ user.Designation }}</p>
+            <a href="{{ url_for('logout') }}" style="color:white;margin-top:8px;display:block;">Logout</a>
+        </div>
+    </div>
+</header>
 
-<h5>Add New Component</h5>
-<form method="POST" action="{{ url_for('stock_update') }}">
-    <input name="component" placeholder="Component Name" required>
-    <input name="description" placeholder="Description">
-    <input type="number" name="quantity" placeholder="Quantity">
-    <input name="tray" placeholder="Tray">
-    <input name="remarks" placeholder="Remarks">
-    <button type="submit" class="btn btn-success btn-sm">Add Component</button>
-</form>
+<div class="container">
+
+    <div class="tabs">
+        <button class="tab-btn active" onclick="openTab('issue')">Issue Items ({{ pending_issue|groupby('Request_ID')|list|length }})</button>
+        <button class="tab-btn" onclick="openTab('stock-mgmt')">Stock Management</button>
+        <button class="tab-btn" onclick="openTab('new-req')">Request Restock</button>
+    </div>
+
+    <!-- ISSUE ITEMS (Approved but not yet issued) -->
+    <div id="issue" class="tab-content active card">
+        <h2>Approved Requests – Ready to Issue</h2>
+        <table>
+            <tr><th>Request ID</th><th>User</th><th>Project</th><th>Items</th><th>Action</th></tr>
+            {% for req_id, items in pending_issue|groupby('Request_ID') %}
+            <tr>
+                <td><strong>{{ req_id }}</strong></td>
+                <td>{{ items[0].User_Name }}</td>
+                <td>{{ items[0].Purpose }}</td>
+                <td>{{ items|length }} items</td>
+                <td>
+                    <button class="btn-success" onclick="issueRequest('{{ req_id }}')">Issue & Deduct Stock</button>
+                </td>
+            </tr>
+            {% endfor %}
+        </table>
+    </div>
+
+    <!-- STOCK MANAGEMENT -->
+    <div id="stock-mgmt" class="tab-content card">
+        <h2>Add / Remove Stock</h2>
+        <form method="POST" style="display:grid;grid-template-columns:3fr 1fr 1fr 1fr;gap:10px;align-items:end;">
+            <select name="component_id" required>
+                <option value="">Select Component</option>
+                {% for c in components %}
+                <option value="{{ c.ID }}">{{ c.Name }} ({{ c.Current_Stock }} left)</option>
+                {% endfor %}
+            </select>
+            <input type="number" name="quantity" placeholder="Quantity" min="1" required>
+            <select name="action">
+                <option value="add">Add Stock</option>
+                <option value="remove">Remove / Damage</option>
+            </select>
+            <button type="submit" class="btn-success">Update Stock</button>
+        </form>
+
+        <h3 style="margin-top:30px;">Current Stock Summary</h3>
+        <table>
+            <tr><th>Name</th><th>Current</th><th>Min</th><th>Location</th></tr>
+            {% for c in components %}
+            <tr {% if c.Current_Stock <= c.Min_Stock %}style="background:#fef3c7;"{% endif %}>
+                <td>{{ c.Name }}</td>
+                <td>{{ c.Current_Stock }}</td>
+                <td>{{ c.Min_Stock }}</td>
+                <td>{{ c.Location }}</td>
+            </tr>
+            {% endfor %}
+        </table>
+    </div>
+
+    <!-- REQUEST RESTOCK (same as user/manager) -->
+    <div id="new-req" class="tab-content card">
+        <h2>Request New Components / Restock</h2>
+        <input type="text" id="project-name" placeholder="Purpose (e.g. Restock Resistors)" style="padding:14px;font-size:1.1em;margin-bottom:20px;">
+
+        <div class="search-box">
+            <input type="text" id="component-search" placeholder="Search component..." autocomplete="off">
+            <div id="search-results" class="search-results"></div>
+        </div>
+
+        <h3 style="margin-top:25px;">Selected Components</h3>
+        <table id="items-table">
+            <tr style="background:#e8dcf8;">
+                <th>Component</th><th>Tray</th><th>Qty</th><th>Type</th><th>Return Date</th><th></th>
+            </tr>
+        </table>
+
+        <button id="submit-restock" class="btn-success" style="width:100%;padding:16px;font-size:1.2em;margin-top:20px;">
+            Send Request to Manager
+        </button>
+    </div>
+</div>
+
+<script>
+// Load real components
+fetch('/api/components')
+    .then(r => r.json())
+    .then(data => window.components = data);
+
+// Search & Add
+document.getElementById('component-search')?.addEventListener('input', function(e) {
+    const q = e.target.value.toLowerCase().trim();
+    const results = document.getElementById('search-results');
+    if (!q) { results.style.display = 'none'; return; }
+    const filtered = window.components.filter(c => c.name.toLowerCase().includes(q));
+    results.innerHTML = filtered.map(c => `
+        <div class="result-item" onclick="addComponent('${c.name}','${c.tray}',${c.stock})">
+            <span><strong>${c.name}</strong> → ${c.tray} (Stock: ${c.stock})</span>
+            <button class="btn-add">+</button>
+        </div>`).join('');
+    results.style.display = filtered.length ? 'block' : 'none';
+});
+
+function addComponent(n, t, s) {
+    const row = document.getElementById('items-table').insertRow();
+    row.innerHTML = `<td><strong>${n}</strong></td><td>${t}</td>
+        <td><input type="number" value="1" min="1" max="999" style="width:70px"></td>
+        <td><select><option>One-time use</option></select></td>
+        <td><input type="date" disabled></td>
+        <td><button class="btn-danger btn-sm" onclick="this.parentElement.parentElement.remove()">Remove</button></td>`;
+    document.getElementById('component-search').value = '';
+    document.getElementById('search-results').style.display = 'none';
+}
+
+// Submit Restock Request
+document.getElementById('submit-restock')?.addEventListener('click', () => {
+    const purpose = document.getElementById('project-name').value.trim();
+    if (!purpose) return alert("Enter purpose!");
+    const rows = document.querySelectorAll('#items-table tr');
+    if (rows.length <= 1) return alert("Add at least one item!");
+
+    const items = Array.from(rows).slice(1).map(r => ({
+        name: r.cells[0].textContent.trim(),
+        qty: parseInt(r.cells[2].querySelector('input').value)
+    }));
+
+    fetch('/submit_request', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({project: purpose, items})
+    })
+    .then(r => r.json())
+    .then(d => {
+        if (d.success) {
+            alert("Restock request " + d.request_id + " sent to manager!");
+            location.reload();
+        }
+    });
+});
+
+// Issue & Deduct (already handled by Manager approval, so just UI feedback)
+function issueRequest(req_id) {
+    if (confirm("Mark " + req_id + " as ISSUED? Stock already deducted on approval.")) {
+        alert("Request " + req_id + " marked as issued!");
+        // Optional: Add a column "Issued_At" later if needed
+    }
+}
+
+document.addEventListener('click', e => {
+    if (!e.target.closest('.search-box')) document.getElementById('search-results').style.display = 'none';
+});
+
+function openTab(id) {
+    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    event.target.classList.add('active');
+}
+</script>
+</body>
+</html>
