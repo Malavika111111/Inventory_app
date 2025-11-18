@@ -390,6 +390,43 @@ def stock_dashboard(user):
     pending_issue = get_approved_requests()
     return render_template('stockincharge_dashboard.html', user=user, components=components, pending_issue=pending_issue)
 
+#------------Updating stock issued-------------
+@app.route("/issue_request", methods=["POST"])
+def issue_request():
+    data = request.get_json()
+    request_id = data["request_id"]
+
+    # Fetch all requests
+    all_requests = requests_ws.get_all_records()
+
+    # Find items belonging to this Request_ID
+    items_to_issue = [r for r in all_requests if r["Request_ID"] == request_id]
+
+    if not items_to_issue:
+        return {"error": "Request not found"}, 404
+
+    # Deduct stock for each item under the same request ID
+    components = components_ws.get_all_records()
+
+    for item in items_to_issue:
+        component_name = item["Component_Name"]
+        qty = int(item["Qty_Requested"])
+
+        for idx, comp in enumerate(components, start=2):
+            if comp["Name"] == component_name:
+                new_qty = int(comp["Current_Stock"]) - qty
+                if new_qty < 0:
+                    new_qty = 0  # Prevent negative stock
+                components_ws.update_cell(idx, 4, new_qty)  # Column D = Current_Stock
+                break
+
+    # Update Request status to "Issued"
+    for idx, row in enumerate(all_requests, start=2):
+        if row["Request_ID"] == request_id:
+            requests_ws.update_cell(idx, 8, "Issued")  # Column H = Status
+
+    return {"success": True, "message": "Stock deducted & request marked as issued!"}
+
 # ==================== RUN ====================
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
