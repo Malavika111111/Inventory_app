@@ -25,7 +25,7 @@
 </head>
 <body>
 
-<!-- HEADER WITH NAME, ID & DESIGNATION -->
+<!-- HEADER -->
 <div class="header text-white">
     <div class="container">
         <div class="row align-items-center">
@@ -81,14 +81,15 @@
 
     <div class="tab-content">
 
-        <!-- PENDING REQUESTS - NOW WORKS 100% -->
+        <!-- PENDING REQUESTS -->
         <div class="tab-pane fade show active" id="pending">
             <div class="card p-4">
                 <h4>Pending Approvals</h4>
 
                 {% set pending_list = requests|selectattr("Status", "equalto", "Pending")|list %}
-                {% if pending_list %}
+                {% set unique_req_ids = pending_list|map(attribute='Request_ID')|unique|list %}
 
+                {% if unique_req_ids %}
                 <div class="table-responsive">
                     <table class="table table-hover align-middle">
                         <thead class="table-light">
@@ -103,43 +104,41 @@
                             </tr>
                         </thead>
                         <tbody>
-                            {% for req in pending_list %}
-                            <tr>
-                                <td><strong>#{{ req.Request_ID }}</strong></td>
-                                <td>{{ req.User_Name }}</td>
-                                <td>{{ req.Purpose }}</td>
-                                <td>
-                                    {% set items_in_req = requests|selectattr("Request_ID", "equalto", req.Request_ID)|list %}
-                                    {% for item in items_in_req %}
-                                        {{ item.Component_Name }}<br>
-                                    {% endfor %}
-                                </td>
-                                // For Quantity
-                                <td>
-                                    {% for item in items_in_req %}
-                                        {{ item.Qty_Requested }}<br>
-                                    {% endfor %}
-                                </td>
-
-                                <td>{{ req.Requested_At[:10] }}</td>
-                                <td>
-                                    <a href="{{ url_for('approve_request', req_id=req.Request_ID) }}" 
-                                       class="btn btn-success btn-sm" 
-                                       onclick="return confirm('Approve request #{{ req.Request_ID }}?')">
-                                        Approve
-                                    </a>
-                                    <a href="{{ url_for('reject_request', req_id=req.Request_ID) }}" 
-                                       class="btn btn-danger btn-sm" 
-                                       onclick="return confirm('Reject request #{{ req.Request_ID }}?')">
-                                        Reject
-                                    </a>
-                                </td>
-                            </tr>
+                            {% for req_id in unique_req_ids %}
+                                {% set items_in_req = pending_list|selectattr("Request_ID", "equalto", req_id)|list %}
+                                {% set first_item = items_in_req[0] %}
+                                <tr>
+                                    <td><strong>#{{ req_id }}</strong></td>
+                                    <td>{{ first_item.User_Name }}</td>
+                                    <td>{{ first_item.Purpose }}</td>
+                                    <td>
+                                        {% for item in items_in_req %}
+                                            {{ item.Component_Name }}<br>
+                                        {% endfor %}
+                                    </td>
+                                    <td>
+                                        {% for item in items_in_req %}
+                                            {{ item.Qty_Requested }}<br>
+                                        {% endfor %}
+                                    </td>
+                                    <td>{{ first_item.Requested_At[:10] }}</td>
+                                    <td>
+                                        <a href="{{ url_for('approve_request', req_id=req_id) }}" 
+                                           class="btn btn-success btn-sm" 
+                                           onclick="return confirm('Approve request #{{ req_id }}?')">
+                                            Approve
+                                        </a>
+                                        <a href="{{ url_for('reject_request', req_id=req_id) }}" 
+                                           class="btn btn-danger btn-sm" 
+                                           onclick="return confirm('Reject request #{{ req_id }}?')">
+                                            Reject
+                                        </a>
+                                    </td>
+                                </tr>
                             {% endfor %}
                         </tbody>
                     </table>
                 </div>
-
                 {% else %}
                 <div class="text-center py-5 text-muted">
                     <h5>No pending requests</h5>
@@ -149,7 +148,7 @@
             </div>
         </div>
 
-        <!-- ORDER COMPONENTS TAB (Manager) - FULLY WORKING -->
+        <!-- ORDER COMPONENTS -->
         <div class="tab-pane fade" id="order">
             <div class="card p-4">
                 <h4>Order Components (Manager)</h4>
@@ -170,7 +169,7 @@
             </div>
         </div>
 
-        <!-- STOCK & ACTIVITY (unchanged) -->
+        <!-- STOCK & ACTIVITY -->
         <div class="tab-pane fade" id="stock">
             <div class="card p-4">
                 <h4>Current Stock</h4>
@@ -212,15 +211,12 @@
     </div>
 </div>
 
-<!-- Warning Popup -->
 <div id="warningPopup" class="warning-popup" style="display:none;"></div>
 
-<!-- SAME JAVASCRIPT FROM BEFORE (Cart, Search, Submit) -->
 <script>
-// ... [Keep the exact same <script> block from my previous message] ...
-// It works perfectly — just copy it here:
 let allComponents = [];
 let managerCart = {};
+let submitInProgress = false;
 
 fetch('/api/components').then(r => r.json()).then(data => {
     allComponents = data;
@@ -282,6 +278,12 @@ function addManagerToCart(name, stock, safe) {
     managerCart[name] = { qty, returnable, returnDate };
     updateManagerCart();
     showWarning(`"${name}" added!`, "success");
+
+    document.getElementById('mqty-' + safe).value = "";
+    document.getElementById('mno-' + safe).checked = true;
+    document.getElementById('myes-' + safe).checked = false;
+    document.getElementById('mdate-' + safe).style.display = "none";
+    document.getElementById('mreturndate-' + safe).value = "";
 }
 
 function updateManagerCart() {
@@ -303,9 +305,14 @@ function showWarning(msg, type="error") {
 }
 
 document.getElementById('submitManagerOrder').addEventListener('click', () => {
+    if (submitInProgress) return;
+    submitInProgress = true;
+    const btn = document.getElementById('submitManagerOrder');
+    btn.disabled = true;
+
     const project = document.getElementById('managerProject').value.trim();
-    if (!project) return showWarning("Enter project name!");
-    if (Object.keys(managerCart).length === 0) return showWarning("Cart is empty!");
+    if (!project) { showWarning("Enter project name!"); submitInProgress=false; btn.disabled=false; return; }
+    if (Object.keys(managerCart).length === 0) { showWarning("Cart is empty!"); submitInProgress=false; btn.disabled=false; return; }
 
     const items = Object.entries(managerCart).map(([n,d]) => ({name:n, qty:d.qty, returnable:d.returnable, returnDate:d.returnDate}));
 
@@ -322,11 +329,13 @@ document.getElementById('submitManagerOrder').addEventListener('click', () => {
             updateManagerCart();
             document.getElementById('managerProject').value = '';
         }
-    });
+        submitInProgress = false;
+        btn.disabled = false;
+    })
+    .catch(err => { showWarning("Failed to submit request!"); submitInProgress=false; btn.disabled=false; });
 });
 </script>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-</body>
 </body>
 </html>
