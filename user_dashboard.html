@@ -241,6 +241,13 @@ function addToCart(name, stock, safeName) {
     cart[name] = { qty, returnable, returnDate };
     updateCart();
     showWarning(`"${name}" × ${qty} added to cart!`, "success");
+
+    // RESET FIELDS after adding to cart
+    document.getElementById('qty-' + safeName).value = "";
+    document.getElementById('no-' + safeName).checked = true;  // default non-returnable
+    document.getElementById('yes-' + safeName).checked = false;
+    document.getElementById('date-section-' + safeName).style.display = "none";
+    document.getElementById('returndate-' + safeName).value = "";
 }
 
 function updateCart() {
