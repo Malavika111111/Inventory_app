@@ -240,16 +240,17 @@ def api_components():
 @app.route("/submit_request", methods=["POST"])
 @login_required()
 def submit_request(user):
-    data = request.json or {}
+    data = request.get_json(force=True)  # force ensures JSON is parsed
     project = (data.get("project") or "No Project Name").strip()
     items = data.get("items", [])
+
     if not items:
         return jsonify({"error": "No items selected"}), 400
 
-    # Check if a pending request with same user + project already exists
+    # Check if a pending request for this project exists
     existing_requests = get_user_requests(user.get("Email"))
     for r in existing_requests:
-        if r["Purpose"].strip() == project and r["Status"].strip().lower() == "pending":
+        if r["Purpose"].strip().lower() == project.lower() and r["Status"].strip().lower() == "pending":
             return jsonify({"error": "Request for this project already submitted"}), 400
 
     ts = datetime.now().strftime("%Y-%m-%d %H:%M")
@@ -260,17 +261,16 @@ def submit_request(user):
             request_id,
             user.get("Email") or session.get("email"),
             user.get("Name"),
-            "",
-            item.get("name", ""),
-            item.get("qty", ""),
+            "",  # Component ID if you have
+            item.get("name",""),
+            item.get("qty",""),
             project,
             "Pending",
             ts,
-            ""
+            ""  # Approved by
         ])
+
     return jsonify({"success": True, "request_id": request_id})
-
-
 
 # ---------------- MANAGER DASHBOARD ----------------
 @app.route("/manager")
