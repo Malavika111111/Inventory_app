@@ -1,4 +1,3 @@
-# app.py - FINAL 100% WORKING VERSION (No errors, no search_tray, password check)
 from flask import Flask, render_template, request, redirect, url_for, session, flash, send_file, jsonify
 from datetime import datetime
 import gspread
