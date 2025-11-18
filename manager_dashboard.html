@@ -96,7 +96,8 @@
                                 <th>Request ID</th>
                                 <th>User</th>
                                 <th>Purpose</th>
-                                <th>Items</th>
+                                <th>Components</th>
+                                <th>Quantity</th>
                                 <th>Date</th>
                                 <th>Action</th>
                             </tr>
@@ -109,8 +110,17 @@
                                 <td>{{ req.Purpose }}</td>
                                 <td>
                                     {% set items_in_req = requests|selectattr("Request_ID", "equalto", req.Request_ID)|list %}
-                                    {{ items_in_req|length }} item{{ "s" if items_in_req|length > 1 else "" }}
+                                    {% for item in items_in_req %}
+                                        {{ item.Component_Name }}<br>
+                                    {% endfor %}
                                 </td>
+                                // For Quantity
+                                <td>
+                                    {% for item in items_in_req %}
+                                        {{ item.Qty_Requested }}<br>
+                                    {% endfor %}
+                                </td>
+
                                 <td>{{ req.Requested_At[:10] }}</td>
                                 <td>
                                     <a href="{{ url_for('approve_request', req_id=req.Request_ID) }}" 
