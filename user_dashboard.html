@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Dashboard • Smart Inventory</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { background: #f8fafc; font-family: 'Segoe UI', sans-serif; min-height: 100vh; }
+        header { background: #6366f1; color: white; padding: 30px 0; box-shadow: 0 4px 20px rgba(0,0,0,0.15); }
+        .header-content { max-width: 1200px; margin: auto; display: flex; justify-content: space-between; align-items: center; padding: 0 20px; flex-wrap: wrap; gap: 20px; }
+        .logo-title h1 { margin: 0; font-size: 2.2rem; font-weight: 700; }
+        .user-info h2 { margin: 0; font-size: 1.5rem; }
+        .container { max-width: 1200px; margin: 30px auto; padding: 0 15px; }
+        .nav-tabs .nav-link { border: none; border-radius: 12px 12px 0 0; padding: 14px 30px; font-weight: 600; color: #64748b; }
+        .nav-tabs .nav-link.active { background: #6366f1; color: white; }
+        .tab-content { background: white; border-radius: 0 12px 12px 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); padding: 35px; }
+        .component-card {
+            border: 2px solid #e2e8f0; border-radius: 16px; padding: 20px; background: #ffffff;
+            transition: all 0.3s; box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+        }
+        .component-card:hover { transform: translateY(-5px); box-shadow: 0 12px 25px rgba(0,0,0,0.12); }
+        .add-btn { background: #6366f1; color: white; border: none; border-radius: 10px; padding: 10px 20px; font-weight: 600; }
+        .add-btn:hover { background: #4f46e5; }
+        .cart-item { background: #f1f5f9; border-radius: 12px; padding: 15px; margin: 10px 0; border-left: 5px solid #6366f1; }
+        .remove-cart { color: #dc2626; cursor: pointer; }
+        .warning-popup {
+            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+            background: #dc2626; color: white; padding: 16px 30px; border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3); z-index: 9999; font-weight: bold;
+            animation: slideUp 0.5s;
+        }
+        @keyframes slideUp { from { bottom: -100px; opacity: 0; } to { bottom: 20px; opacity: 1; } }
+        .badge-pending { background: #fb923c; }
+        .badge-approved { background: #34d399; }
+        .badge-rejected { background: #f87171; }
+        .btn-submit { background: #10b981; font-size: 1.2rem; padding: 16px; border-radius: 12px; }
+        .btn-submit:hover { background: #059669; }
+    </style>
+</head>
+<body>
+
+<header>
+    <div class="header-content">
+        <div class="logo-title">
+            <h1>Smart Inventory System</h1>
+            <p class="mb-0">Request components instantly and track every item in real time</p>
+        </div>
+        <div class="user-info">
+            <h2>{{ user.Name }}</h2>
+            <p><strong>ID:</strong> {{ user.EmployeeID }} • <strong>Role:</strong> {{ user.Role }}</p>
+            <p><strong>Designation:</strong> {{ user.Designation }}</p>
+            <a href="{{ url_for('logout') }}" style="color:white; text-decoration:underline;">Logout</a>
+        </div>
+    </div>
+</header>
+
+<div class="container">
+    <ul class="nav nav-tabs" id="myTab" role="tablist">
+        <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#newreq">New Request</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#myreq">My Requests</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#borrowings">My Borrowed Items</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#activity">Activity Log</button></li>
+    </ul>
+
+    <div class="tab-content mt-3">
+
+        <!-- NEW REQUEST TAB -->
+        <div class="tab-pane fade show active" id="newreq">
+            <h4 class="mb-4">New Component Request</h4>
+            <div class="mb-4">
+                <input type="text" id="projectName" class="form-control form-control-lg" placeholder="Project Name / Purpose (required)">
+            </div>
+            <input type="text" id="searchInput" class="form-control form-control-lg mb-4" placeholder="Search components...">
+
+            <div id="componentsList" class="row g-4"></div>
+
+            <!-- CART SUMMARY -->
+            <div id="cartSection" class="mt-5" style="display:none;">
+                <h4>Your Cart (<span id="cartCount">0</span> items)</h4>
+                <div id="cartItems"></div>
+                <button id="submitCart" class="btn btn-submit w-100 mt-3">
+                    Submit Request
+                </button>
+            </div>
+        </div>
+
+        <!-- OTHER TABS (unchanged) -->
+        <div class="tab-pane fade" id="myreq">
+            <h4>My Requests</h4>
+            {% if requests %}
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead class="table-light">
+                        <tr><th>ID</th><th>Component</th><th>Qty</th><th>Purpose</th><th>Status</th><th>Date</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for r in requests %}
+                        <tr>
+                            <td><strong>{{ r.Request_ID }}</strong></td>
+                            <td>{{ r.Component_Name }}</td>
+                            <td>{{ r.Qty_Requested }}</td>
+                            <td>{{ r.Purpose }}</td>
+                            <td>
+                                {% if r.Status == 'Pending' %}<span class="badge badge-pending text-white px-3 py-2">Pending</span>
+                                {% elif r.Status == 'Approved' %}<span class="badge badge-approved text-white px-3 py-2">Approved</span>
+                                {% elif r.Status == 'Rejected' %}<span class="badge badge-rejected text-white px-3 py-2">Rejected</span>{% endif %}
+                            </td>
+                            <td>{{ r.Requested_At[:10] }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}<p class="text-center text-muted py-5">No requests yet.</p>{% endif %}
+        </div>
+
+        <div class="tab-pane fade" id="borrowings">
+            <h4>My Borrowed Items</h4>
+            {% set borrowed = requests | selectattr("Status", "equalto", "Approved") | list %}
+            {% if borrowed %}<table class="table"><tbody>{% for r in borrowed %}<tr><td>{{ r.Request_ID }}</td><td>{{ r.Component_Name }}</td><td>{{ r.Qty_Requested }}</td><td>{{ r.Purpose }}</td><td>{{ r.Approved_At[:10] or "—" }}</td></tr>{% endfor %}</tbody></table>
+            {% else %}<p class="text-center text-muted py-5">No borrowed items.</p>{% endif %}
+        </div>
+
+        <div class="tab-pane fade" id="activity">
+            <h4>Activity Log</h4>
+            {% if requests %}<table class="table"><tbody>{% for r in requests | reverse %}<tr><td>{{ r.Requested_At[:16].replace(" ", "<br>") | safe }}</td><td>{% if r.Status == 'Pending' %}<span class="badge badge-pending text-white">Created</span>{% elif r.Status == 'Approved' %}<span class="badge badge-approved text-white">Approved</span>{% elif r.Status == 'Rejected' %}<span class="badge badge-rejected text-white">Rejected</span>{% endif %}</td><td>{{ r.Component_Name }} × {{ r.Qty_Requested }} — {{ r.Purpose }}</td></tr>{% endfor %}</tbody></table>
+            {% else %}<p class="text-center text-muted py-5">No activity.</p>{% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Warning Popup -->
+<div id="warningPopup" class="warning-popup" style="display:none;"></div>
+
+<script>
+let allComponents = [];
+let cart = {};  // { "ESP32": { qty: 2, returnable: true, returnDate: "2025-05-01" } }
+
+fetch('/api/components')
+    .then(r => r.json())
+    .then(data => {
+        allComponents = data;
+        displayComponents(data);
+    });
+
+function displayComponents(list) {
+    document.getElementById('componentsList').innerHTML = list.map(c => {
+        const safeName = c.name.replace(/[^a-zA-Z0-9]/g, '_');
+        return `
+            <div class="col-md-6 col-lg-4">
+                <div class="component-card">
+                    <h5 class="mb-3">${c.name}</h5>
+                    <small class="text-muted d-block mb-3">Tray: ${c.tray}</small>
+
+                    <div class="mb-3">
+                        <label class="form-label"><strong>Quantity:</strong></label>
+                        <input type="number" min="1" class="form-control" id="qty-${safeName}" placeholder="Enter qty">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label"><strong>Returnable?</strong></label><br>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="radio" name="return-${safeName}" value="yes" id="yes-${safeName}">
+                            <label class="form-check-label" for="yes-${safeName}">Yes</label>
+                        </div>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="radio" name="return-${safeName}" value="no" id="no-${safeName}" checked>
+                            <label class="form-check-label" for="no-${safeName}">No</label>
+                        </div>
+                    </div>
+
+                    <div class="mb-3" id="date-section-${safeName}" style="display:none;">
+                        <label class="form-label"><strong>Return Date:</strong></label>
+                        <input type="date" class="form-control" id="returndate-${safeName}">
+                    </div>
+
+                    <button class="btn add-btn w-100" onclick="addToCart('${c.name}', ${c.stock}, '${safeName}')">
+                        Add to Cart
+                    </button>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+// Show/hide return date
+document.addEventListener('change', function(e) {
+    if (e.target.name && e.target.name.startsWith('return-')) {
+        const safeName = e.target.name.split('-')[1];
+        const section = document.getElementById('date-section-' + safeName);
+        if (e.target.value === 'yes') section.style.display = 'block';
+        else section.style.display = 'none';
+    }
+});
+
+function addToCart(name, stock, safeName) {
+    const qty = parseInt(document.getElementById('qty-' + safeName).value);
+    if (!qty || qty <= 0) return showWarning("Please enter quantity!");
+    if (qty > stock) return showWarning(`Only ${stock} available!`);
+
+    const returnable = document.getElementById('yes-' + safeName).checked;
+    const returnDate = returnable ? document.getElementById('returndate-' + safeName).value : null;
+    if (returnable && !returnDate) return showWarning("Please select return date!");
+
+    cart[name] = { qty, returnable, returnDate };
+    updateCart();
+    showWarning(`"${name}" × ${qty} added to cart!`, "success");
+}
+
+function updateCart() {
+    const items = Object.keys(cart);
+    document.getElementById('cartCount').textContent = items.length;
+    document.getElementById('cartSection').style.display = items.length > 0 ? 'block' : 'none';
+
+    document.getElementById('cartItems').innerHTML = items.map(name => {
+        const d = cart[name];
+        return `
+            <div class="cart-item">
+                <strong>${name}</strong> × ${d.qty}
+                ${d.returnable ? ` → Return by <strong>${d.returnDate}</strong>` : ' <strong>(Non-Returnable)</strong>'}
+                <span class="remove-cart float-end" onclick="removeFromCart('${name}')">Remove</span>
+            </div>
+        `;
+    }).join('') || '<p class="text-muted">Cart is empty</p>';
+}
+
+function removeFromCart(name) {
+    delete cart[name];
+    updateCart();
+}
+
+function showWarning(msg, type = "error") {
+    const popup = document.getElementById('warningPopup');
+    popup.textContent = msg;
+    popup.style.background = type === "success" ? "#10b981" : "#dc2626";
+    popup.style.display = 'block';
+    setTimeout(() => popup.style.display = 'none', 3000);
+}
+
+// Search
+document.getElementById('searchInput').addEventListener('input', function() {
+    const query = this.value.toLowerCase();
+    const filtered = allComponents.filter(c => c.name.toLowerCase().includes(query));
+    displayComponents(filtered);
+});
+
+// Submit Cart
+document.getElementById('submitCart').addEventListener('click', function() {
+    const project = document.getElementById('projectName').value.trim();
+    if (!project) return showWarning("Please enter Project Name!");
+
+    if (Object.keys(cart).length === 0) return showWarning("Cart is empty!");
+
+    const items = Object.entries(cart).map(([name, d]) => ({
+        name, qty: d.qty, returnable: d.returnable, returnDate: d.returnDate
+    }));
+
+    fetch('/submit_request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ project, items })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            alert(`Request ${data.request_id} submitted successfully!`);
+            cart = {};
+            updateCart();
+            document.getElementById('projectName').value = '';
+            location.reload();
+        }
+    });
+});
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
