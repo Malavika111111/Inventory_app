@@ -103,9 +103,17 @@
                             <td>{{ r.Qty_Requested }}</td>
                             <td>{{ r.Purpose }}</td>
                             <td>
-                                {% if r.Status == 'Pending' %}<span class="badge badge-pending text-white px-3 py-2">Pending</span>
-                                {% elif r.Status == 'Approved' %}<span class="badge badge-approved text-white px-3 py-2">Approved</span>
-                                {% elif r.Status == 'Rejected' %}<span class="badge badge-rejected text-white px-3 py-2">Rejected</span>{% endif %}
+                                {% if r.Status == 'Pending' %}
+                                    <span class="badge badge-pending text-white px-3 py-2">Pending</span>
+                                {% elif r.Status == 'Approved' %}
+                                    <span class="badge badge-approved text-white px-3 py-2">Approved</span>
+                                {% elif r.Status == 'Issued' %}
+                                    <span class="badge badge-approved text-white px-3 py-2">Issued</span>
+                                {% elif r.Status == 'Rejected' %}
+                                    <span class="badge badge-rejected text-white px-3 py-2">Rejected</span>
+                                {% else %}
+                                    <span class="badge text-secondary px-3 py-2">{{ r.Status or '—' }}</span>
+                                {% endif %}
                             </td>
                             <td>{{ r.Requested_At[:10] }}</td>
                         </tr>
@@ -119,11 +127,13 @@
         <!-- BORROWED ITEMS TAB -->
         <div class="tab-pane fade" id="borrowings">
             <h4>My Borrowed Items</h4>
-            {% set borrowed = requests | selectattr("Status", "equalto", "Approved") | list %}
-            {% if borrowed %}
+            {% set approved = requests | selectattr("Status", "equalto", "Approved") | list %}
+            {% set issued = requests | selectattr("Status", "equalto", "Issued") | list %}
+            {% set borrowed_all = approved + issued %}
+            {% if borrowed_all %}
                 <table class="table">
                     <tbody>
-                        {% for r in borrowed %}
+                        {% for r in borrowed_all %}
                         <tr>
                             <td>{{ r.Request_ID }}</td>
                             <td>{{ r.Component_Name }}</td>
@@ -149,9 +159,17 @@
                     <tr>
                         <td>{{ r.Requested_At[:16].replace(" ", "<br>") | safe }}</td>
                         <td>
-                            {% if r.Status == 'Pending' %}<span class="badge badge-pending text-white">Created</span>
-                            {% elif r.Status == 'Approved' %}<span class="badge badge-approved text-white">Approved</span>
-                            {% elif r.Status == 'Rejected' %}<span class="badge badge-rejected text-white">Rejected</span>{% endif %}
+                            {% if r.Status == 'Pending' %}
+                                <span class="badge badge-pending text-white">Created</span>
+                            {% elif r.Status == 'Approved' %}
+                                <span class="badge badge-approved text-white">Approved</span>
+                            {% elif r.Status == 'Issued' %}
+                                <span class="badge badge-approved text-white">Issued</span>
+                            {% elif r.Status == 'Rejected' %}
+                                <span class="badge badge-rejected text-white">Rejected</span>
+                            {% else %}
+                                <span class="badge text-secondary">{{ r.Status or '—' }}</span>
+                            {% endif %}
                         </td>
                         <td>{{ r.Component_Name }} × {{ r.Qty_Requested }} — {{ r.Purpose }}</td>
                     </tr>
@@ -176,8 +194,11 @@ let cart = {};
 fetch('/api/components')
     .then(r => r.json())
     .then(data => {
-        allComponents = data;
-        displayComponents(data);
+        // if your /api/components returns an object with { components: [...] } adjust below
+        if (Array.isArray(data)) allComponents = data;
+        else if (data.components) allComponents = data.components;
+        else allComponents = [];
+        displayComponents(allComponents);
     });
 
 function displayComponents(list) {
