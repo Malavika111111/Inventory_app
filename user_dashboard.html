@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>User Dashboard • Smart Inventory</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
@@ -16,21 +16,13 @@
         .nav-tabs .nav-link { border: none; border-radius: 12px 12px 0 0; padding: 14px 30px; font-weight: 600; color: #64748b; }
         .nav-tabs .nav-link.active { background: #6366f1; color: white; }
         .tab-content { background: white; border-radius: 0 12px 12px 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); padding: 35px; }
-        .component-card {
-            border: 2px solid #e2e8f0; border-radius: 16px; padding: 20px; background: #ffffff;
-            transition: all 0.3s; box-shadow: 0 4px 10px rgba(0,0,0,0.05);
-        }
+        .component-card { border: 2px solid #e2e8f0; border-radius: 16px; padding: 20px; background: #ffffff; transition: all 0.3s; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
         .component-card:hover { transform: translateY(-5px); box-shadow: 0 12px 25px rgba(0,0,0,0.12); }
         .add-btn { background: #6366f1; color: white; border: none; border-radius: 10px; padding: 10px 20px; font-weight: 600; }
         .add-btn:hover { background: #4f46e5; }
         .cart-item { background: #f1f5f9; border-radius: 12px; padding: 15px; margin: 10px 0; border-left: 5px solid #6366f1; }
         .remove-cart { color: #dc2626; cursor: pointer; }
-        .warning-popup {
-            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
-            background: #dc2626; color: white; padding: 16px 30px; border-radius: 12px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.3); z-index: 9999; font-weight: bold;
-            animation: slideUp 0.5s;
-        }
+        .warning-popup { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #dc2626; color: white; padding: 16px 30px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); z-index: 9999; font-weight: bold; animation: slideUp 0.5s; }
         @keyframes slideUp { from { bottom: -100px; opacity: 0; } to { bottom: 20px; opacity: 1; } }
         .badge-pending { background: #fb923c; }
         .badge-approved { background: #34d399; }
@@ -80,9 +72,7 @@
             <div id="cartSection" class="mt-5" style="display:none;">
                 <h4>Your Cart (<span id="cartCount">0</span> items)</h4>
                 <div id="cartItems"></div>
-                <button id="submitCart" class="btn btn-submit w-100 mt-3">
-                    Submit Request
-                </button>
+                <button id="submitCart" class="btn btn-submit w-100 mt-3">Submit Request</button>
             </div>
         </div>
 
@@ -127,11 +117,24 @@
         <!-- BORROWED ITEMS TAB -->
         <div class="tab-pane fade" id="borrowings">
             <h4>My Borrowed Items</h4>
+
             {% set approved = requests | selectattr("Status", "equalto", "Approved") | list %}
             {% set issued = requests | selectattr("Status", "equalto", "Issued") | list %}
             {% set borrowed_all = approved + issued %}
+
             {% if borrowed_all %}
-                <table class="table">
+                <div class="table-responsive">
+                <table class="table table-bordered align-middle">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Request ID</th>
+                            <th>Component</th>
+                            <th>Quantity</th>
+                            <th>Project</th>
+                            <th>Requested Date</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
                     <tbody>
                         {% for r in borrowed_all %}
                         <tr>
@@ -140,10 +143,20 @@
                             <td>{{ r.Qty_Requested }}</td>
                             <td>{{ r.Purpose }}</td>
                             <td>{{ r.Requested_At[:10] }}</td>
+                            <td>
+                                {% if r.Status == 'Issued' %}
+                                    <button class="btn btn-sm btn-danger" onclick="openReturnModal('{{ r.Request_ID }}','{{ r.Component_Name }}', {{ r.Qty_Requested }})">
+                                        Return
+                                    </button>
+                                {% else %}
+                                    <button class="btn btn-sm btn-secondary" disabled>Not Issued</button>
+                                {% endif %}
+                            </td>
                         </tr>
                         {% endfor %}
                     </tbody>
                 </table>
+                </div>
             {% else %}
                 <p class="text-center text-muted py-5">No borrowed items.</p>
             {% endif %}
@@ -187,14 +200,53 @@
 <!-- Warning Popup -->
 <div id="warningPopup" class="warning-popup" style="display:none;"></div>
 
+<!-- Return Modal -->
+<div class="modal fade" id="returnModal" tabindex="-1" aria-labelledby="returnModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="fa fa-undo"></i> Return Item</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <form id="returnForm" onsubmit="return submitReturn(event)">
+          <input type="hidden" id="ret_req_id">
+          <input type="hidden" id="ret_comp_name">
+          <div class="mb-3">
+            <label class="form-label">Borrowed Quantity</label>
+            <input type="number" id="ret_borrowed_qty" class="form-control" readonly>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Return Quantity</label>
+            <input type="number" id="ret_qty" class="form-control" min="1" required>
+            <div class="form-text">Enter number ≤ borrowed quantity.</div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Remarks (optional)</label>
+            <textarea id="ret_remarks" class="form-control" rows="2" placeholder="e.g. partial return, damaged etc."></textarea>
+          </div>
+          <div class="d-flex justify-content-end gap-2">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" class="btn btn-success">Confirm Return</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
 let allComponents = [];
 let cart = {};
+const returnModalEl = document.getElementById('returnModal');
+let returnModal;
+document.addEventListener('DOMContentLoaded', () => {
+    returnModal = new bootstrap.Modal(returnModalEl);
+});
 
 fetch('/api/components')
     .then(r => r.json())
     .then(data => {
-        // if your /api/components returns an object with { components: [...] } adjust below
         if (Array.isArray(data)) allComponents = data;
         else if (data.components) allComponents = data.components;
         else allComponents = [];
@@ -265,7 +317,7 @@ function addToCart(name, stock, safeName) {
 
     // RESET FIELDS after adding to cart
     document.getElementById('qty-' + safeName).value = "";
-    document.getElementById('no-' + safeName).checked = true;  // default non-returnable
+    document.getElementById('no-' + safeName).checked = true;
     document.getElementById('yes-' + safeName).checked = false;
     document.getElementById('date-section-' + safeName).style.display = "none";
     document.getElementById('returndate-' + safeName).value = "";
@@ -307,6 +359,7 @@ document.getElementById('searchInput').addEventListener('input', function() {
     displayComponents(filtered);
 });
 
+// Submit request (unchanged)
 document.getElementById('submitCart').addEventListener('click', function() {
     const project = document.getElementById('projectName').value.trim();
     if (!project) return showWarning("Enter project name!");
@@ -321,9 +374,7 @@ document.getElementById('submitCart').addEventListener('click', function() {
 
     fetch('/submit_request', {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ project, items })
     })
     .then(res => res.json())
@@ -341,6 +392,59 @@ document.getElementById('submitCart').addEventListener('click', function() {
     .catch(err => showWarning("Failed to submit request"));
 });
 
+// ---------------------- Return modal logic ----------------------
+function openReturnModal(requestId, compName, borrowedQty) {
+    document.getElementById('ret_req_id').value = requestId;
+    document.getElementById('ret_comp_name').value = compName;
+    document.getElementById('ret_borrowed_qty').value = borrowedQty;
+    document.getElementById('ret_qty').max = borrowedQty;
+    document.getElementById('ret_qty').value = borrowedQty; // default full return
+    document.getElementById('ret_remarks').value = '';
+    returnModal.show();
+}
+
+function submitReturn(e) {
+    e.preventDefault();
+    const request_id = document.getElementById('ret_req_id').value;
+    const component_name = document.getElementById('ret_comp_name').value;
+    const borrowed_qty = parseInt(document.getElementById('ret_borrowed_qty').value);
+    const return_qty = parseInt(document.getElementById('ret_qty').value);
+    const remarks = document.getElementById('ret_remarks').value.trim();
+
+    if (!request_id || !component_name || !return_qty || return_qty <= 0) {
+        alert("Invalid return data.");
+        return;
+    }
+    if (return_qty > borrowed_qty) {
+        alert("Return quantity cannot exceed borrowed quantity.");
+        return;
+    }
+
+    fetch('/return_item', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            request_id,
+            component_name,
+            return_qty,
+            remarks
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            alert(data.message || "Returned successfully");
+            location.reload();
+        } else {
+            alert(data.error || "Return failed");
+        }
+    })
+    .catch(err => {
+        console.error(err);
+        alert("Return failed");
+    })
+    .finally(() => returnModal.hide());
+}
 </script>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
