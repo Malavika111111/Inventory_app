@@ -47,18 +47,48 @@ def get_user(email):
     users = users_ws.get_all_records()
     return next((u for u in users if u.get("Email", "").lower() == (email or "").lower()), None)
 
+def update_component_stock(component_name, qty_to_add):
+    """
+    Updates stock by matching component name (case-insensitive).
+    Adds qty_to_add back to Current_Stock.
+    Returns True if updated, False if component not found.
+    """
+    components = components_ws.get_all_records()
+    for i, row in enumerate(components, start=2):  # sheet rows start at 2 for data
+        # defensive checks for keys existing
+        name = row.get("Name", "")
+        if name and name.strip().lower() == str(component_name).strip().lower():
+            try:
+                current_qty = int(row.get("Current_Stock", 0) or 0)
+            except Exception:
+                current_qty = 0
+            try:
+                add = int(qty_to_add)
+            except Exception:
+                add = 0
+            new_qty = current_qty + add
+            # Update Current Stock (column 4 expected to be Current_Stock)
+            components_ws.update_cell(i, 4, new_qty)
+            return True
+    return False
+
 def get_borrowed_items(user_email):
+    """
+    Return list of borrowed items for the user.
+    Consider statuses: Approved, Issued, Partially Returned (these show as "borrowed")
+    """
     rows = requests_ws.get_all_records()
     borrowed = []
-
     for r in rows:
-        if r["User_Email"].lower() == user_email.lower() and r["Status"] == "Issued":
+        status = (r.get("Status") or "").strip()
+        if (r.get("User_Email") or "").lower() == user_email.lower() and status in ["Approved", "Issued", "Partially Returned"]:
             borrowed.append({
-                "Request_ID": r["Request_ID"],
-                "Component_Name": r["Component_Name"],
-                "Qty": r["Qty_Requested"],
-                "Purpose": r["Purpose"],
-                "Requested_At": r["Requested_At"]
+                "Request_ID": r.get("Request_ID"),
+                "Component_Name": r.get("Component_Name"),
+                "Qty_Requested": int(r.get("Qty_Requested") or 0),
+                "Purpose": r.get("Purpose"),
+                "Requested_At": r.get("Requested_At"),
+                "Status": status
             })
     return borrowed
 
@@ -69,7 +99,6 @@ def get_user_requests(user_email):
     out = []
     for row in rows:
         (req_id, email, uname, cid, cname, qty, purpose, status, req_at, appr_by) = (row + [""] * 10)[:10]
-
         if (email or "").lower() == user_email.lower():
             out.append({
                 "Request_ID": req_id,
@@ -91,7 +120,6 @@ def get_manager_requests():
     out = []
     for row in rows:
         (req_id, uemail, uname, cid, cname, qty, purpose, status, req_at, appr_by) = (row + [""] * 10)[:10]
-
         out.append({
             "Request_ID": req_id,
             "User_Email": uemail,
@@ -112,14 +140,13 @@ def get_approved_requests():
     out = []
     for row in rows:
         (req_id, email, uname, cid, cname, qty, purpose, status, req_at, appr_by) = (row + [""] * 10)[:10]
-
-        if status.lower() == "approved":
+        if (status or "").strip().lower() == "approved":
             out.append({
                 "Request_ID": req_id,
                 "User_Name": uname,
                 "Purpose": purpose,
                 "Component_Name": cname,
-                "Qty_Requested": qty,   # FIXED
+                "Qty_Requested": qty,
                 "Requested_At": req_at
             })
     return out
@@ -130,15 +157,13 @@ def update_request_status(request_id, new_status, manager_name=""):
         cells = requests_ws.findall(str(request_id), in_column=1)
         if not cells:
             return False
-
         ts = datetime.now().strftime("%Y-%m-%d %H:%M")
         for c in cells:
             row = c.row
-            requests_ws.update_cell(row, 8, new_status)
-            requests_ws.update_cell(row, 9, ts)
-            requests_ws.update_cell(row, 10, manager_name)
+            requests_ws.update_cell(row, 8, new_status)   # H = Status
+            requests_ws.update_cell(row, 9, ts)          # I = Timestamp/Requested_At (used as last action time)
+            requests_ws.update_cell(row, 10, manager_name) # J = Approved_By / metadata
         return True
-
     except Exception as e:
         print("Error updating:", e)
         return False
@@ -265,7 +290,7 @@ def submit_request(user):
     # Check if a pending request for this project exists
     existing_requests = get_user_requests(user.get("Email"))
     for r in existing_requests:
-        if r["Purpose"].strip().lower() == project.lower() and r["Status"].strip().lower() == "pending":
+        if (r.get("Purpose") or "").strip().lower() == project.lower() and (r.get("Status") or "").strip().lower() == "pending":
             return jsonify({"error": "Request for this project already submitted"}), 400
 
     ts = datetime.now().strftime("%Y-%m-%d %H:%M")
@@ -295,19 +320,73 @@ def return_item(user):
     data = request.get_json()
     request_id = data.get("request_id")
     component_name = data.get("component_name")
+    try:
+        return_qty = int(data.get("return_qty", 0))
+    except Exception:
+        return_qty = 0
+    remarks = data.get("remarks", "")
 
-    if not request_id or not component_name:
+    if not request_id or not component_name or return_qty <= 0:
         return {"error": "Invalid data"}, 400
 
-    # Find matching request row
     rows = requests_ws.get_all_records()
     for idx, row in enumerate(rows, start=2):
-        if row["Request_ID"] == request_id and row["Component_Name"] == component_name:
-            # Update status to Returned
-            requests_ws.update_cell(idx, 8, "Returned")
-            return {"success": True, "message": "Item marked as returned!"}
+        if (row.get("Request_ID") == request_id) and (row.get("Component_Name") or "").strip().lower() == component_name.strip().lower():
+
+            # ensure borrowed qty is int
+            try:
+                borrowed_qty = int(row.get("Qty_Requested") or 0)
+            except Exception:
+                borrowed_qty = 0
+
+            ts = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+            # ===== CASE A: FULL RETURN =====
+            if return_qty == borrowed_qty:
+                # Update status -> Returned
+                requests_ws.update_cell(idx, 8, "Returned")  # H = Status
+                # Update timestamp (I)
+                requests_ws.update_cell(idx, 9, ts)
+                # Optionally annotate Approved_By (J) with return info (non-destructive)
+                try:
+                    prev = requests_ws.cell(idx, 10).value or ""
+                    note = f"{prev} | Returned by {user.get('Name','')}"
+                    requests_ws.update_cell(idx, 10, note)
+                except Exception:
+                    pass
+
+                # Add stock back by component name
+                update_component_stock(component_name, return_qty)
+
+                return {"success": True, "message": f"Full return processed. {return_qty} items returned."}
+
+            # ===== CASE B: PARTIAL RETURN =====
+            elif return_qty < borrowed_qty:
+                remaining_qty = borrowed_qty - return_qty
+
+                # Update remaining qty (F) and status (H)
+                requests_ws.update_cell(idx, 6, remaining_qty)  # F = Qty_Requested
+                requests_ws.update_cell(idx, 8, "Partially Returned")  # H = Status
+                requests_ws.update_cell(idx, 9, ts)
+
+                # annotate Approved_By for audit (optional)
+                try:
+                    prev = requests_ws.cell(idx, 10).value or ""
+                    note = f"{prev} | Partial return by {user.get('Name','')} ({return_qty})"
+                    requests_ws.update_cell(idx, 10, note)
+                except Exception:
+                    pass
+
+                # Add returned qty back to stock
+                update_component_stock(component_name, return_qty)
+
+                return {"success": True, "message": f"Partial return processed. Returned {return_qty}, Remaining {remaining_qty}."}
+
+            else:
+                return {"error": "Return quantity exceeds borrowed quantity!"}, 400
 
     return {"error": "Item not found"}, 404
+
 
 # ---------------- MANAGER DASHBOARD ----------------
 @app.route("/manager")
@@ -420,18 +499,23 @@ def issue_request():
     components = components_ws.get_all_records()
     for item in items_to_issue:
         cname = item["Component_Name"]
-        qty = int(item["Qty_Requested"])
+        try:
+            qty = int(item["Qty_Requested"])
+        except Exception:
+            qty = 0
         for idx, comp in enumerate(components, start=2):
-            if comp["Name"] == cname:
-                new_qty = int(comp["Current_Stock"]) - qty
+            if comp.get("Name") and comp["Name"].strip().lower() == (cname or "").strip().lower():
+                new_qty = int(comp.get("Current_Stock", 0) or 0) - qty
                 if new_qty < 0: new_qty = 0
                 components_ws.update_cell(idx,4,new_qty)
                 break
 
-    # Mark issued
+    # Mark issued and update timestamp
+    ts = datetime.now().strftime("%Y-%m-%d %H:%M")
     for idx, row in enumerate(all_requests, start=2):
         if row["Request_ID"] == request_id:
             requests_ws.update_cell(idx,8,"Issued")
+            requests_ws.update_cell(idx,9,ts)
 
     return {"success":True,"message":"Stock deducted & request marked as issued!"}
 
