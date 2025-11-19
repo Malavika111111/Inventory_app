@@ -47,6 +47,21 @@ def get_user(email):
     users = users_ws.get_all_records()
     return next((u for u in users if u.get("Email", "").lower() == (email or "").lower()), None)
 
+def get_borrowed_items(user_email):
+    rows = requests_ws.get_all_records()
+    borrowed = []
+
+    for r in rows:
+        if r["User_Email"].lower() == user_email.lower() and r["Status"] == "Issued":
+            borrowed.append({
+                "Request_ID": r["Request_ID"],
+                "Component_Name": r["Component_Name"],
+                "Qty": r["Qty_Requested"],
+                "Purpose": r["Purpose"],
+                "Requested_At": r["Requested_At"]
+            })
+    return borrowed
+
 # ---------------- REQUEST PARSERS ----------------
 
 def get_user_requests(user_email):
@@ -222,9 +237,9 @@ def logout():
 @login_required()
 def user_dashboard(user):
     components = get_components()
-    my_requests = get_user_requests(user.get("Email") or session.get("email"))
-    return render_template("user_dashboard.html", user=user, components=components, requests=my_requests)
-
+    my_requests = get_user_requests(user.get("Email"))
+    borrowed_items = get_borrowed_items(user.get("Email"))
+    return render_template("user_dashboard.html", user=user, components=components, requests=my_requests, borrowed=borrowed_items)
 
 @app.route("/api/components")
 def api_components():
@@ -236,7 +251,7 @@ def api_components():
     } for c in components])
 
 
-# ---------------- FIXED SUBMIT REQUEST ----------------
+# ---------------- SUBMIT REQUEST ----------------
 @app.route("/submit_request", methods=["POST"])
 @login_required()
 def submit_request(user):
@@ -271,6 +286,28 @@ def submit_request(user):
         ])
 
     return jsonify({"success": True, "request_id": request_id})
+
+
+#---------------RETURN ITEM------------
+@app.route("/return_item", methods=["POST"])
+@login_required()
+def return_item(user):
+    data = request.get_json()
+    request_id = data.get("request_id")
+    component_name = data.get("component_name")
+
+    if not request_id or not component_name:
+        return {"error": "Invalid data"}, 400
+
+    # Find matching request row
+    rows = requests_ws.get_all_records()
+    for idx, row in enumerate(rows, start=2):
+        if row["Request_ID"] == request_id and row["Component_Name"] == component_name:
+            # Update status to Returned
+            requests_ws.update_cell(idx, 8, "Returned")
+            return {"success": True, "message": "Item marked as returned!"}
+
+    return {"error": "Item not found"}, 404
 
 # ---------------- MANAGER DASHBOARD ----------------
 @app.route("/manager")
